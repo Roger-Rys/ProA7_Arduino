@@ -1,0 +1,283 @@
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial proA7(10, 11); // pin RX y TX
+TinyGPSPlus GPS; // Nombre GPS
+
+////////VARIABLES PINES
+int datosGPS = 0; // Cambia de modo Serial al modo SerialGPS
+int p_mux = 3; // Pin para mux
+int p_PWRKEY = 2; // Pin para activar la red GSM
+int ledSend = 7, ledLlamada = 6, ledGPSon = 4; // Leds de activacion
+
+////////VARIABLE LLAMADAS
+int cuentaLlamada = 0;
+
+//VARIABLES PARA SEPARAR TRAMA
+char *strtok(char *str1, const char *str2); //Subfuncion separa la trama
+char *numeroPhone = NULL; //No almacena en una memoria especifica
+char numeroCellChar[100];
+
+////////DATOS GPS
+float LAT = 0, LNG = 0; // Valores de lat y long
+float LAT_COMP = 0, LNG_COMP = 0; // Valores de lat y long nuevos a comparar
+long TIME = 0;  // Almacena el tiempo recibido del moduloA7
+int SATELITES = 0; // Almacena el num Satelites del moduloA7
+int esperaDatosGps = 200; // Tiempo de espera
+int correccionLocacion = 0; // Numero de veces que se va a corregir 
+
+////////VARIABLES PARA DETECTAR LLAMADAS
+char valorChar = 0; //Recive los valores char de proA7
+String valorStr; // Almacena valores de "valorChar"
+char trama1[100]; // valorStr a trama1
+char tramaPhone[100]; // Almacena Numero
+String strNumero1, strNumTel=""; // trama separadas almacenada en StrNu..1 y 6
+String strNumTelNew = "1"; //Almacenara el valor de strNumTel
+char cNumero1[10], cNumTel[13]; // strNumero1 y 6 a arregloChar cNumero1 y 6
+char cNumTelNew[13];
+char datoNumero[35]; // Almacena numero Telefonico
+
+////////VARIABLES PARA ENVIO MENSAJE SMS
+char ATenvioSMS [20];
+
+/*******FUNC SETUP***************************************************************/
+void setup() {
+  ////////DECLARAR PINES
+  pinMode(p_mux, OUTPUT);// Pin MUX como salida
+  pinMode(ledLlamada, OUTPUT); pinMode(ledGPSon, OUTPUT); pinMode(ledSend, OUTPUT);
+  pinMode(p_PWRKEY, OUTPUT);
+
+  delay(20000);  //Esperar a que modulo A7 inicialice
+  Serial.begin(9600);
+  while (!Serial) {
+    ;// Espera al puerto serial se conecte
+  }
+  proA7.begin(9600); // Velocidad a transferir datos
+  configuracionInicial(); // Configuracion inicial
+}
+
+/*******FUNC LOOP**********************************************************************/
+void loop() {
+  ////////MODO NORMAL
+  if (datosGPS == 1) {
+    SerialDatosGPS(); // Activa el modo SerialDatosGPS
+  }
+  else {
+    ComunicacionSerial(); // Modo serialComunicacionSerial
+  }
+}
+
+/*******FUNC COMUNICACION_SERIAL*****************************************/
+void ComunicacionSerial() {
+  char *cadenaSeparar; // Cadena a separar
+  char *token;  // token es SubStrings de un String almacena la separacion
+  int conteo = 0; // contador
+  int conteoRing = 0; // conteoRing
+  int contador = 0;
+  cNumero1[0] = NULL;
+
+  digitalWrite(p_mux, LOW); // Cambia MUX al modo Seial
+  ////////////////////////MODO SERIAL//////////////////////////////////
+  while (proA7.available() > 0) {
+    valorChar = proA7.read(); // valorChar
+    valorStr += valorChar; //valorStr es un String
+    if (valorChar == '\n') { // Detecta "\n" (salto de linea)
+      Serial.print("STRING:"); Serial.println(valorStr);
+      valorStr.toCharArray(trama1, 100); // ValorStr a un arregloChar
+
+      ///////DETECTA EL RING/////////
+      if ((strstr(trama1, " RING") != NULL) && conteoRing < 1) { // Detecta si trama1 = RING
+        valorStr = " "; // Limpia valorStr
+        conteoRing++; // Aumenta conteoRing
+        proA7.println("AT+CLCC"); // Que numero llamada
+        delay(500);
+        memset(tramaPhone, '\0', 100); // Limpia trama2
+        memset(cNumero1, '\0', 100);
+      }
+
+      ///////DETECTA EL +CLCC/////////                                          ó strstr(cNumTelNew, cNumTel) == NULL; son diferentes
+      else if ((strstr(trama1, "+CLCC: 1,1,4,0,0,") != NULL) && contador < 1 && strNumTelNew != strNumTel) { // Detecta si trama1 = +CLCC:...
+        valorStr.toCharArray(tramaPhone, 100); // Almacena valorStr en tramaPhone
+        contador++; // Aumenta "contador"
+        proA7.println("ATH"); // Cuelga la llamada
+        if (tramaPhone[0] != NULL ) { // Si tramaPhone no esta vacio
+          Serial.print("numeroCelular: "); Serial.println(tramaPhone);
+          cadenaSeparar = tramaPhone; // Almacena "tramaPhone" en "cadenaSeparar"
+          while ((token = strtok_r(cadenaSeparar, ",", &cadenaSeparar)) != NULL) { // "," es el delimitador a separar
+            conteo ++; // Aumenta "conteo"
+            if (conteo == 1) { // Si "conteo"=1
+              strNumero1 = token; // Token se almacena en "strNumero1"
+            }
+            if (conteo == 6) { // Si "conteo"=6
+              strNumTel = token; // Token se almacena en "strNumTel"
+              strNumTelNew = strNumTel;
+            }
+            strNumero1.toCharArray(cNumero1, 10); // "strNumero1" a arregloChar en cNumero1
+            strNumTel.toCharArray(cNumTel, 13); // "strNumTel" a arregloChar en cNumTel
+            strNumTelNew.toCharArray(cNumTelNew, 13); //
+            
+          }
+          if (cNumero1[0] != NULL && cNumTel[0] != NULL) { // Si son diferentes de NULL
+            strcat(datoNumero, "NumeroTelef: "); // Almacena strig y caracter
+            strcat(datoNumero, cNumTel); // La union se guarda en "datoNumero"
+            Serial.println(datoNumero);
+          }
+        }
+        valorStr = " "; // Limpia valorStr
+        memset(trama1, '\0', 100); // Limpia Trama
+      }
+
+      ///////ENVIA EL MENSAJE SMS DE POSICION A NUMERO DETERMINADO//////
+      else if (strstr(trama1, " RING") != NULL && conteoRing < 2 && strstr(cNumTelNew, cNumTel) != NULL) {
+        conteoRing++; // Aumenta conteoRing (a 2)
+
+        digitalWrite(ledLlamada, HIGH); // Activa LedLlamada
+        cuentaLlamada++;
+        Serial.print("LLamadaNo "); Serial.println(cuentaLlamada);
+        proA7.println("ATH"); // Cuelga la llamada
+        digitalWrite(ledLlamada, LOW); // Desactiva LedLlamada
+
+        ////////ACTIVA GPS
+        datosGPS = 1; // Activa el modo SerialDatosGPS
+        proA7.println("AT+GPS=1"); delay(500); // Activa el GPS
+        digitalWrite(ledGPSon, HIGH); // Activa el ledGPSon
+        Serial.println("GPS Activado"); delay(500);
+        DatosObtenidosGPS(); // Corrige valores GPS
+
+        ////////DESACTIVAR GPS
+        datosGPS = 0; // Activa el modo ComunicacionSerial
+        proA7.println("AT+GPS=0"); delay(200); // Desactiva GPS
+        Serial.println("GPS Desactivado");
+        digitalWrite(ledGPSon, HIGH); // Desactiva ledGPSon
+        delay(2000);
+        Serial.println("---VALORES ALMACENADOS---");  // Muesta los valores GPS almacenados
+        Serial.print("LAT="); Serial.println(LAT);
+        Serial.print("LNG="); Serial.println(LNG);
+        Serial.print("TIME="); Serial.println(TIME);
+        Serial.print("SATELITES="); Serial.println(SATELITES);
+
+        ////////ENVIAR SMS
+        digitalWrite(ledSend, HIGH); delay(2000); // Activa ledSend (Envia SMS)
+        proA7.println("AT+CMGF=1"); delay(2000); // Configura el Formato a enviar 1 es TEXT
+
+        strcat(ATenvioSMS, "AT+CMGS="); // Almacena strig y caracter strNumTelNew
+        strcat(ATenvioSMS, cNumTelNew ); // La union se guarda en "ATenvioSMS"
+        proA7.println(datoNumero); delay(2000); // Determina el numero a enviar SMS
+        proA7.print(GPS.location.lat(), 6); proA7.print(","); // SMS contiene datos de
+        proA7.println(GPS.location.lng(), 6);     // latitud(,) longitud
+        delay(2000);
+        proA7.println((char)26); // char26 es "ESC", para finalizar mensaje SMS
+        Serial.println("Mensaje enviado");
+        digitalWrite(ledSend, LOW); // Desactiva ledSend (Envio el SMS)
+      }
+
+      ///////BORRA STRING Y TRAMA1/////////
+      else {
+        valorStr = " "; // Limpia valorStr
+        memset(trama1, '\0', 100); // Limpia Trama
+      }
+    }
+  }
+
+  ///////SERIAL DE ARDUINO/////////
+  while (Serial.available()) {
+    proA7.write(Serial.read()); // Serial lee, Disp escribe
+  } delay(50);
+}
+
+/*******ENCUENTRA DATOS DE LATITUD Y LONGITUD**************************************************/
+void DatosObtenidosGPS() {
+  for (int i = 0; i <= esperaDatosGps; i++) {
+    if (LAT != LAT_COMP && LNG != LNG_COMP) {
+      LAT_COMP = LAT; LNG_COMP = LNG; // Se almacena los nuevos valores
+      correccionLocacion++;
+      if (correccionLocacion == 3) { //Se corrige los datos de locacion
+        i = esperaDatosGps; // i va a valer "esperaDatosGps", para terminar secuencia
+        Serial.println("----Valor GPS obtenidos----"); delay(3000);
+      }
+    }
+    else if (i == 80) {
+      proA7.println("AT+GPS=1"); delay(500);
+    }
+    else {
+      SerialDatosGPS(); delay(500);
+      Serial.print("Valor i: "); Serial.println(i);
+    }
+  }
+}
+
+/*******FUNC DATOS_GPS********************************************************/
+void SerialDatosGPS() {
+  digitalWrite(p_mux, HIGH); // Cambia MUX al modo SerialDatosGPS
+  while (proA7.available()) {
+    GPS.encode(proA7.read());
+  }
+  delay(50);
+  if (GPS.location.isUpdated()) {
+    Serial.print("LAT="); Serial.println(GPS.location.lat(), 6); // Obtiene datos de latitud
+    LAT = GPS.location.lat(), 6;   Serial.println(LAT);
+    Serial.print("LNG="); Serial.println(GPS.location.lng(), 6); // Obtiene datos de longitud
+    LNG = GPS.location.lng(), 6;
+    Serial.print("TIME="); Serial.println(GPS.time.value()); // Obtiene datos de tiempo
+    TIME = GPS.time.value();
+    Serial.print("SATELITES="); Serial.println(GPS.satellites.value());
+    SATELITES = GPS.satellites.value();
+    delay(2000);
+  }
+}
+
+/*******FUNC CONFIGURACION_INIC*******************************************************/
+void configuracionInicial() {
+  digitalWrite(p_mux, LOW); // Cambia MUX al serial
+  digitalWrite(p_PWRKEY, HIGH); delay(3000); // 2 seg para Activar la red GSM
+  digitalWrite(p_PWRKEY, LOW); delay(10000);
+  Serial.println("PWR_KEY Activado"); // Mensaje que la red esta activada
+
+  if (escribirComando("AT", "OK") != 0) { // Envia AT y espera respuesta OK
+    Serial.println("----Conectado con modulo A7----");
+  }
+  else {
+    digitalWrite(p_PWRKEY, HIGH); delay(3000); // 2 seg para Activar la red GSM
+    digitalWrite(p_PWRKEY, LOW); delay(10000);
+  }
+
+  digitalWrite(ledGPSon, HIGH); // Activar ledGPS
+  proA7.println("AT+GPS=1"); delay(20000); // Activar GPS
+  SerialDatosGPS(); // Lee los datos GPS
+  Serial.println("----GPS Activado----"); delay(500); // Mensaje
+  DatosObtenidosGPS(); // Obtiene datos GPS correctos
+  proA7.println("AT+GPS=0"); delay(500); // Desactivar GPS
+  digitalWrite(p_mux, LOW); // Cambia MUX al serial
+  Serial.println("----GPS Desactivado----"); delay(500);
+  digitalWrite(ledGPSon, LOW); // Desactiva ledGPS
+
+  Serial.println("-------SISTEMA FUNCIONANDO-------");
+  delay(2000);
+  proA7.println("AT"); delay(500);
+}
+
+/*******FUNC ESCRIBIR COMANDOS AT Y RESPUESTA**********************************************************************/
+int escribirComando(String ATcomandos, char*Respuesta) {
+  bool valido = 0; // Valor si el resultado es valido(1) o no (0)
+  int numChar = 0; // Contador se almacena en "caracter[]"
+  char caracteres[100]; // Se almacenos los caracteres enviado por moduloA7
+  while (proA7.available() > 0) // Detecta si proA7 esta activado
+    proA7.read(); delay(10);
+  proA7.println(ATcomandos); // Envia a proA7 el "ATcomandos"
+  do {
+    if (proA7.available() != 0 ) {
+      caracteres[numChar] = proA7.read(); // Valores leidos se almacenan en "caracter[]"
+
+      if (strstr(caracteres, Respuesta) != NULL) {// Comparacion entre "caracteres" y "Respuesta"
+        valido = 1; delay(10); // Si son iguales, valido = 1
+      }
+    }
+  }
+  while (valido == 0);
+  Serial.println(caracteres);
+  return valido; // Retorna con valore de "valido"
+}
+
+
+
+

@@ -1,0 +1,164 @@
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial proA7(10,11); // pin RX y TX
+TinyGPSPlus GPS; // Nombre GPS
+////////VARIABLES PINES
+int p_GPSon = 3, p_GPSoff = 4, p_SMSsend = 5, datosGPS = 0;
+int p_PWRKEY = 2, p_OnPWRKEY = 1;
+int ledSend = 7;
+
+////////VARIABLE LLAMADAS
+char entradaChar = 0;
+String entradaStr = "";
+int cuentaLlamada = 0, limiteLlamada = 10;
+
+////////DATOS GPS
+float LAT=0, LNG=0; 
+float LAT_COMP = 0, LNG_COMP = 0;
+long TIME=0; 
+int SATELITES=0;
+int esperaDatosGps = 200;
+int correccionLocacion = 0;
+
+////////INICIO DE DISPOSITIVO
+int inicioDispositivo = 10;
+
+////////FUNC SETUP///////////////////////////////////////////////////
+void setup() {
+  ////////DECLARAR PINES
+  pinMode(p_GPSoff,INPUT);pinMode(p_GPSon,INPUT);
+  pinMode(p_OnPWRKEY,INPUT);pinMode(p_PWRKEY,OUTPUT);
+  pinMode(ledSend,OUTPUT);
+  
+  Serial.begin(9600); proA7.begin(9600);
+  configuracionInicial();
+}
+
+////////FUNC CONFIGURACION_INIC///////////////////////////////////////////////////
+void configuracionInicial(){
+  digitalWrite(p_PWRKEY,HIGH);delay(2500); // 2 seg para Activar la red GSM
+  digitalWrite(p_PWRKEY,LOW);
+  Serial.println("PWR_KEY Activado");
+  for(int i =0; i <= inicioDispositivo;i++){
+     Serial.println("AT");delay(600);
+     proA7.println("AT");delay(600);
+     ComunicacionSerial(); 
+     if(entradaStr.indexOf("OK") >= 2){
+       i = inicioDispositivo; // i va a valer "inicioDispositivo", para terminar secuencia
+       entradaStr ="";  
+       Serial.println("----Conectado con modulo A7----");   
+     }
+     else{i=5;}
+  }
+  
+  proA7.println("AT+GPS=1");delay(20000); 
+  DatosGPS(); // lee los datos GPS
+  Serial.println("GPS Activado");delay(500);
+  DatosObtenidosGPS();  
+  proA7.println("AT+GPS=0");delay(500); 
+  Serial.println("GPS Desactivado");delay(500);
+  Serial.println("Sistema Encendido");
+  Serial.println("FUNCIONANDO");
+  delay(2000);
+  proA7.println("AT");delay(500);
+}
+
+////////FUNC COMUNICACION_SERIAL///////////////////////////////////////////////////
+void ComunicacionSerial(){  
+  while(proA7.available()){
+    entradaChar = proA7.read();
+    Serial.write(entradaChar);
+    entradaStr = entradaStr + entradaChar;    
+  } delay(50);
+  while(Serial.available()){
+    proA7.write(Serial.read()); //serial lee, disp escribe
+  } delay(50);
+}
+
+////////FUNC DATOS_GPS///////////////////////////////////////////////////
+void DatosGPS(){
+  while(proA7.available()){
+      GPS.encode(proA7.read()); 
+  }
+  delay(50); 
+  if(GPS.location.isUpdated()){
+      Serial.print("LAT=");Serial.println(GPS.location.lat(),6); //Obtiene datos de latitud
+      LAT=GPS.location.lat(),6;   Serial.println(LAT);  
+      Serial.print("LNG=");Serial.println(GPS.location.lng(),6); //Obtiene datos de longitud
+      LNG=GPS.location.lng(),6;
+      //Serial.print("LAT_COM=");Serial.println(GPS.location.rawLat().deg);
+      Serial.print("TIME=");Serial.println(GPS.time.value());
+      TIME=GPS.time.value();   
+      Serial.print("SATELITES=");Serial.println(GPS.satellites.value());
+      SATELITES=GPS.satellites.value();
+      delay(2000);     
+  }
+}
+////////ENCUENTRA DATOS DE LATITUD Y LONGITUD
+void DatosObtenidosGPS(){
+  for(int i = 0; i <= esperaDatosGps; i++){
+      if(LAT != LAT_COMP && LNG != LNG_COMP){
+        LAT_COMP = LAT; LNG_COMP = LNG; // Se almacena los nuevos valores
+        correccionLocacion++;
+        if(correccionLocacion == 3){ //Se corrige los datos de locacion
+          i = esperaDatosGps; // i va a valer "esperaDatosGps", para terminar secuencia              
+          Serial.println("----Valor GPS obtenidos----");delay(3000);    
+        }
+      }
+      else if(i==80){
+           proA7.println("AT+GPS=1");delay(500); 
+      }
+      else{
+           DatosGPS();delay(500); 
+           Serial.print("Valor i: ");Serial.println(i);
+      }
+  }
+}
+
+////////FUNC LOOP///////////////////////////////////////////////////
+void loop() {
+  ////////MODO NORMAL
+  if(datosGPS==1){DatosGPS();} // Activa el GPS
+  else{ComunicacionSerial();}  // Modo serial
+
+  ////////DETECTA LLAMADAS
+  if(entradaStr.indexOf("RING")>=2){ // Busca el string RING
+     Serial.println("llamada entrante"); delay(1000); 
+     cuentaLlamada++;
+     Serial.print("LLamadaNo ");Serial.println(cuentaLlamada);
+     ////////CUELGA LLAMADA
+     proA7.println("ATH"); 
+     entradaStr=" "; // Borramos lo que almacena entradaStr
+          
+     ////////ACTIVA GPS     
+        datosGPS=1; // Modo GPS Activado
+        proA7.println("AT");delay(500);
+        proA7.println("AT+GPS=1");delay(500); 
+        Serial.println("GPS Activado");delay(500); 
+        delay(10000);
+        DatosObtenidosGPS();                
+        
+     ////////DESACTIVAR GPS
+      datosGPS=0;
+      proA7.println("AT+GPS=0");delay(200); // Modo GPS Desactivado
+      Serial.println("GPS Desactivado");
+      proA7.println("AT");delay(2000);
+      Serial.println("---VALORES ALMACENADOS---");  //Mostrar malores almacenados 
+      Serial.print("LAT=");Serial.println(LAT);
+      Serial.print("LNG=");Serial.println(LNG);
+      Serial.print("TIME=");Serial.println(TIME);
+      Serial.print("SATELITES=");Serial.println(SATELITES);
+
+     ////////ENVIAR SMS
+     digitalWrite(ledSend,HIGH);delay(2000);
+     proA7.println("AT+CMGF=1");delay(2000);
+      proA7.println("AT+CMGS=0993011650");delay(2000);
+      proA7.print(GPS.location.lat(),6);proA7.print(","); // datos latitud, longitud
+      proA7.println(GPS.location.lng(),6);
+      delay(2000);
+      proA7.println((char)26); // es ESC  
+     Serial.println("Mensaje enviado");
+     digitalWrite(ledSend,LOW);
+  } 
+}
