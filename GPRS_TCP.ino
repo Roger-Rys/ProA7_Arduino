@@ -7,7 +7,7 @@ bool TCP_GPRS() { //voil TCP_GPRS()
   delay(100);
   escribirComando("AT+CGACT=1,1", 10000, true); //Activate PDP, open Internet service
   delay(100);
-  bool confirmar = escribirComando("AT+CIPSTART=TCP,api.thingspeak.com,80", 10000, true);
+  bool confirmar = escribirComando("AT+CIPSTART=TCP,api.thingspeak.com,80", 11000, true);
   if(confirmar){
     return true; 
   }

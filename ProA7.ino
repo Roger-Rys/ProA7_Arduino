@@ -59,19 +59,8 @@ void loop() {
   //ACTIVAR DATOS
   else if ((conteoRing % 2) == 1 && NumTelSav == NumTelRec && conteoRing > 0 && enviarDatos == false) { // Son iguales
     Serial.println("---DATOS ENCENDIDO---");
-    delay(3000);
-
-    if (TCP_GPRS()) {
-      ////////ACTIVA TCP_GPRS
-      enviarDatos = true; //Activo el envio de datos por internet
-
-      Serial.println("Activado TCP_GPRS!!!");
-    }
-    else {
-      enviarDatos = false;
-      Serial.println("OFF TCP_GPRS");
-    }
-
+    delay(500);
+    enviarDatos = true;
   }
   //APAGAR DATOS
   else if ((conteoRing % 2) == 0 && NumTelSav == NumTelRec && conteoRing > 0) { //SON iguales
@@ -93,13 +82,14 @@ void loop() {
     conteoRing = 0;
   }
   else if (enviarDatos) {
+    delay(2000);
     enviarDatosGPS();
-    delay(300);
+   
     //serialA7(); // Detectar si se recibe llamadas
-    //delay(300);
+    //delay(1000);
   }
   else { // Se activo con valor de 0
     ComunicacionSerial(); // Modo serialComunicacionSerial
   }
-  
+
 }

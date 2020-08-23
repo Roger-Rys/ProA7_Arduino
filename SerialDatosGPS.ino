@@ -1,7 +1,7 @@
 /*******FUNC DATOS_GPS********************************************************/
 String SerialDatosGPS() {
   digitalWrite(p_mux, HIGH); // Cambia MUX al modo SerialDatosGPS
-
+  
   while (proA7.available()) {
     GPS.encode(proA7.read());
   }
