@@ -45,7 +45,7 @@ void setup() {
     ;// Espera al puerto serial se conecte
   }
   proA7.begin(9600); // Velocidad a transferir datos
-  Serial.println("------------------------INICIO------------------------");
+  Serial.println("----INICIO----");
   configuracionInicial(); // Configuracion inicial
 }
 
@@ -54,44 +54,40 @@ void loop() {
   ////////MODO NORMAL
   if (NumTelRec != NumTelSav) { // Son diferentes, ninguna similitud NULL
     NumTelSav = NumTelRec;
-    Serial.print("Numero Telefonico Guardado: "); Serial.println(NumTelSav);
+    Serial.print("Telefono Guardado: "); Serial.println(NumTelSav);
   }
   //ACTIVAR DATOS
   else if ((conteoRing % 2) == 1 && NumTelSav == NumTelRec && conteoRing > 0 && enviarDatos == false) { // Son iguales
-    Serial.println("---------DATOS ENCENDIDO---------");
+    Serial.println("---DATOS ENCENDIDO---");
     delay(3000);
+
     if (TCP_GPRS()) {
       ////////ACTIVA TCP_GPRS
       enviarDatos = true; //Activo el envio de datos por internet
-      
-      ////////ACTIVA GPS
-      while (escribirComando("AT+GPS=1", 2000, true) != true) { // Envia AT y espera respuesta OK
-        escribirComando("AT+GPS=0", 2000, true);
-        Serial.println("----GPS DESACTIVADO----");
-      }
+
       Serial.println("Activado TCP_GPRS!!!");
     }
     else {
       enviarDatos = false;
-      Serial.println("Sin activar TCP_GPRS");
+      Serial.println("OFF TCP_GPRS");
     }
+
   }
   //APAGAR DATOS
   else if ((conteoRing % 2) == 0 && NumTelSav == NumTelRec && conteoRing > 0) { //SON iguales
     ////////DESACTIVAR GPS
     escribirComando("AT+GPS=0", 2000, true);
-    Serial.println("----GPS DESACTIVADO----");
+    Serial.println("--GPS DESACTIVADO--");
     digitalWrite(ledGPSon, LOW); // Desactiva ledGPS
-    
+
     ////////DESACTIVAR RED
-    Serial.println("---------DATOS APAGAR---------");
     escribirComando("AT+CIPCLOSE", 2000, true);
     escribirComando("AT+CIPSHUT", 2000, true);
-    
+
     ////////DESACTIVAR enviarDatos
     enviarDatos = false;
 
-    Serial.println("------Conexion cerrada---------");
+    Serial.println("--Conexion cerrada--");
     delay(3000);
 
     conteoRing = 0;
@@ -99,10 +95,11 @@ void loop() {
   else if (enviarDatos) {
     enviarDatosGPS();
     delay(300);
-    serialA7(); // Detectar si se recibe llamadas
-    delay(300);
+    //serialA7(); // Detectar si se recibe llamadas
+    //delay(300);
   }
   else { // Se activo con valor de 0
     ComunicacionSerial(); // Modo serialComunicacionSerial
   }
+  
 }
