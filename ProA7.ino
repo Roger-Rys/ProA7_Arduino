@@ -26,6 +26,7 @@ char *numeroPhone = NULL; //No almacena en una memoria especifica
 
 ///////DATOS POR INTERNET
 bool enviarDatos = false;//Defecto false
+bool iniciado = false;
 
 /*******FUNC SETUP***************************************************************/
 void setup() {

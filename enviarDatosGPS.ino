@@ -2,6 +2,7 @@
 void enviarDatosGPS() {
   String posicion = "";
   delay(500);
+  
   ////////ACTIVA GPS
   while (escribirComando("AT+GPS=1", 3000, true) != true) { // Envia AT y espera respuesta OK
     escribirComando("AT+GPS=0", 6000, true);
@@ -12,21 +13,25 @@ void enviarDatosGPS() {
     posicion = SerialDatosGPS(); // Lee los datos GPS y guardar valores en variable
     delay(1000);
   } while (posicion.length() <= 32);
-  delay(500);
+  delay(250);//500
+  
   ////////DESACTIVA GPS
-  escribirComando("AT+GPS=0", 10000, true);
+  escribirComando("AT+GPS=0", 5000, true);//10000
   digitalWrite(p_mux, LOW); // Cambia MUX al serial
-  delay(1000);
+  delay(500);//1000
 
-  while (TCP_GPRS() != true) {
+  while (TCP_GPRS(true,iniciado) != true) {
     ////////ACTIVA TCP_GPRS
-    delay(1000);
-    Serial.println("Desactivado TCP_GPRS");
+    iniciado=false;
+    escribirComando("AT+CIPCLOSE", 4000, true);
+    delay(100); //1000
+    escribirComando("AT+CIPSHUT", 4000, true);
     delay(100);
-    TCP_GPRS();
+    Serial.println("Desactivado TCP_GPRS");
   }
   delay(500);
   Serial.println("Activado TCP_GPRS!!!");
+  iniciado=true;
 
   if (posicion.length() > 32) {
    
@@ -43,10 +48,6 @@ void enviarDatosGPS() {
       proA7.println((char)26);
       delay(5000);
       serialA7();    
-    /*
-    escribirComando(dato, 3000, true);
-    delay(100);
-    */
     escribirComando("AT+CIPCLOSE", 4000, true);
     delay(100);
       
@@ -56,8 +57,9 @@ void enviarDatosGPS() {
       digitalWrite(p_PWRKEY, LOW);
     }
     Serial.println("Enviado");
+    
     delay(100);
-    escribirComando("AT+CIPSTART=TCP,api.thingspeak.com,80", 10000, true);
-    delay(100);
+    //escribirComando("AT+CIPSTART=TCP,api.thingspeak.com,80", 10000, true);
+    //delay(100);
   }
 }
