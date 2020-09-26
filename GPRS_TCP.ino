@@ -11,7 +11,9 @@ bool TCP_GPRS(bool inicio, bool aIniciado) { //voil TCP_GPRS()
   }  
   bool confirmar = escribirComando("AT+CIPSTART=TCP,api.thingspeak.com,80", 11000, true);
   if(confirmar){
-    return true; 
+    return true;
+    digitalWrite(onRed, HIGH);  
   }
   return false;   
+  digitalWrite(onRed, LOW); 
 }

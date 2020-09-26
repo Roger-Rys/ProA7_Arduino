@@ -20,6 +20,7 @@ void enviarDatosGPS() {
   digitalWrite(p_mux, LOW); // Cambia MUX al serial
   delay(500);//1000
 
+  //Comprobar si activa todo de TCP_GPRS
   while (TCP_GPRS(true,iniciado) != true) {
     ////////ACTIVA TCP_GPRS
     iniciado=false;
@@ -49,6 +50,7 @@ void enviarDatosGPS() {
       delay(5000);
       serialA7();    
     escribirComando("AT+CIPCLOSE", 4000, true);
+    digitalWrite(ledSend, HIGH); //Indicador de envio de mensaje 
     delay(100);
       
     while (escribirComando("AT", 3000, true) != true) { // Envia AT y espera respuesta OK
@@ -58,6 +60,7 @@ void enviarDatosGPS() {
     }
     Serial.println("Enviado");
     
+    digitalWrite(ledSend, LOW);  //Apagar indicador de envio de mensaje
     delay(100);
     //escribirComando("AT+CIPSTART=TCP,api.thingspeak.com,80", 10000, true);
     //delay(100);

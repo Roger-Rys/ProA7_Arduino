@@ -7,7 +7,7 @@ TinyGPSPlus GPS; // Nombre GPS
 ////////VARIABLES PINES
 byte p_mux = 3; // Pin para mux
 byte p_PWRKEY = 2; // Pin para activar la red GSM
-byte ledSend = 7, ledLlamada = 6, ledGPSon = 4; // Leds de activacion
+byte ledSend = 7, ledLlamada = 6, ledGPSon = 4, onRed = 5;// Leds de activacion
 
 ////////COMUNICACION_SERIAL
 byte conteoRing = 0; // conteoRing
@@ -65,29 +65,16 @@ void loop() {
   }
   //APAGAR DATOS
   else if ((conteoRing % 2) == 0 && NumTelSav == NumTelRec && conteoRing > 0) { //SON iguales
-    ////////DESACTIVAR GPS
-    escribirComando("AT+GPS=0", 2000, true);
-    Serial.println("--GPS DESACTIVADO--");
-    digitalWrite(ledGPSon, LOW); // Desactiva ledGPS
-
-    ////////DESACTIVAR RED
-    escribirComando("AT+CIPCLOSE", 2000, true);
-    escribirComando("AT+CIPSHUT", 2000, true);
-
     ////////DESACTIVAR enviarDatos
     enviarDatos = false;
-
     Serial.println("--Conexion cerrada--");
-    delay(3000);
-
-    conteoRing = 0;
   }
+  //POCESO DE ENVIO DE DATOS
   else if (enviarDatos) {
-    delay(2000);
+    delay(1000);
     enviarDatosGPS();
-   
-    //serialA7(); // Detectar si se recibe llamadas
-    //delay(1000);
+    delay(1000);
+    serialA7(); // Detectar si se recibe llamadas    
   }
   else { // Se activo con valor de 0
     ComunicacionSerial(); // Modo serialComunicacionSerial

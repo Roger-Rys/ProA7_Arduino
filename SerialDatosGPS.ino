@@ -13,6 +13,8 @@ String SerialDatosGPS() {
     enviar = "&field1=" + String(GPS.location.lat(), 6) + "&field2=" + String(GPS.location.lng(), 6);
   }
   if(enviar.length()>=32){
+    //Detectar si recibe llamada
+    serialA7();
     return enviar;
   }
 }
